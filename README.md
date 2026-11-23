@@ -41,14 +41,14 @@
 
 #### Windows（零依赖，使用系统内置 PowerShell）
 ```powershell
-git clone https://github.com/<your-username>/antigravity-image-quota.git
+git clone https://github.com/hhaosknn632486ppk-netizen/antigravity-image-quota.git
 cd antigravity-image-quota
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
 #### macOS / Linux（零依赖，使用 Python 3 标准库）
 ```bash
-git clone https://github.com/<your-username>/antigravity-image-quota.git
+git clone https://github.com/hhaosknn632486ppk-netizen/antigravity-image-quota.git
 cd antigravity-image-quota
 chmod +x install.sh && ./install.sh
 ```

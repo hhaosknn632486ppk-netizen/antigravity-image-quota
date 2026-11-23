@@ -1,0 +1,12 @@
+{
+  "name": "image-quota-tracker",
+  "displayName": "Image Quota Tracker",
+  "version": "0.3.0",
+  "description": "Local rolling-window estimator, auto-calibrator, and interactive sidebar/side-pane dashboard for Antigravity built-in image generation quota (512/1K/2K/4K resolution weighting).",
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "查看我当前的生图额度估算和近 5 小时记录",
+    "分析我的撞墙校准样本，看看谷歌更接近按分辨率加权还是按张数计费",
+    "把我的生图 5 小时参考上限调成 6，并开启低额度前弹窗确认"
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "image-quota-tracker": {
+    "PreToolUse": [
+      {
+        "matcher": "invoke_subagent|generate_image|edit_image",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"./scripts/run-hook.cmd\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "invoke_subagent|generate_image|edit_image",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"./scripts/run-hook.cmd\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "\"./scripts/run-hook.cmd\"",
+        "timeout": 10
+      }
+    ],
+    "PostInvocation": [
+      {
+        "type": "command",
+        "command": "\"./scripts/run-hook.cmd\"",
+        "timeout": 10
+      }
+    ]
+  }
+}

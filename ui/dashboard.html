@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Quota Tracker</title>
+<style>
+  :root {
+    --bg-primary: var(--color-background-primary, #0f1117);
+    --bg-secondary: var(--color-background-secondary, #171a22);
+    --bg-tertiary: var(--color-background-tertiary, #1f2430);
+    --text-primary: var(--color-text-primary, #f1f5f9);
+    --text-secondary: var(--color-text-secondary, #94a3b8);
+    --text-tertiary: var(--color-text-tertiary, #64748b);
+    --border: var(--color-border-primary, rgba(148, 163, 184, 0.16));
+    --border-strong: var(--color-border-secondary, rgba(148, 163, 184, 0.28));
+    --accent: var(--color-text-info, #38bdf8);
+    --success: var(--color-text-success, #22c55e);
+    --warning: var(--color-text-warning, #f59e0b);
+    --danger: var(--color-text-danger, #ef4444);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --font: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif);
+  }
+
+  [data-theme="light"] {
+    --bg-primary: var(--color-background-primary, #ffffff);
+    --bg-secondary: var(--color-background-secondary, #f8fafc);
+    --bg-tertiary: var(--color-background-tertiary, #f1f5f9);
+    --text-primary: var(--color-text-primary, #0f172a);
+    --text-secondary: var(--color-text-secondary, #475569);
+    --text-tertiary: var(--color-text-tertiary, #64748b);
+    --border: var(--color-border-primary, rgba(15, 23, 42, 0.10));
+    --border-strong: var(--color-border-secondary, rgba(15, 23, 42, 0.18));
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font);
+    font-size: 13px;
+    line-height: 1.45;
+    padding: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .logo-badge {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, #0ea5e9, #6366f1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .title {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .subtitle {
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  /* Buttons */
+  button {
+    font-family: inherit;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    padding: 5px 9px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+  button:hover:not(:disabled) {
+    background: var(--bg-tertiary);
+    border-color: var(--border-strong);
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.primary {
+    background: #0284c7;
+    border-color: #0284c7;
+    color: #fff;
+  }
+  button.primary:hover:not(:disabled) { background: #0369a1; }
+  button.danger {
+    color: var(--danger);
+    border-color: rgba(239, 68, 68, 0.35);
+  }
+  button.danger:hover:not(:disabled) { background: rgba(239, 68, 68, 0.12); }
+  button.warn {
+    color: var(--warning);
+    border-color: rgba(245, 158, 11, 0.35);
+  }
+  button.warn:hover:not(:disabled) { background: rgba(245, 158, 11, 0.12); }
+  button.mini {
+    font-size: 11px;
+    padding: 3px 7px;
+  }
+  button.icon-del {
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    padding: 2px 5px;
+    font-size: 14px;
+    line-height: 1;
+    border-radius: 5px;
+  }
+  button.icon-del:hover:not(:disabled) {
+    color: var(--danger);
+    background: rgba(239, 68, 68, 0.14);
+  }
+
+  /* Card */
+  .card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .card-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  /* Status Pill */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+  }
+  .pill.ok { color: var(--success); background: rgba(34, 197, 94, 0.12); border-color: rgba(34, 197, 94, 0.25); }
+  .pill.low { color: var(--warning); background: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.28); }
+  .pill.cooldown { color: var(--danger); background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.28); }
+  .pill.muted { color: var(--text-secondary); background: var(--bg-tertiary); border-color: var(--border); font-weight: 500; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* Cooldown Banner */
+  .cooldown-banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    background: rgba(239, 68, 68, 0.10);
+    border: 1px solid rgba(239, 68, 68, 0.28);
+    font-size: 12px;
+    color: var(--danger);
+  }
+  .cooldown-banner.show { display: flex; }
+
+  /* Hero Meter */
+  .hero-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .hero-big { display: flex; align-items: baseline; gap: 6px; }
+  .hero-num {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .hero-unit { font-size: 12px; color: var(--text-secondary); }
+  .hero-meta {
+    text-align: right;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+  .hero-meta strong { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+  /* Progress bar */
+  .bar-track {
+    width: 100%;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--bg-tertiary);
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.25s;
+    background: var(--success);
+  }
+  .bar-fill.low { background: var(--warning); }
+  .bar-fill.cooldown { background: var(--danger); }
+
+  /* Remaining Capacity Strip */
+  .capacity-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+  .capacity-items {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .capacity-items strong { color: var(--text-primary); }
+
+  /* Dual Track Stats Grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .stat-box {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .stat-label { font-size: 11px; color: var(--text-tertiary); }
+  .stat-val { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat-sub { font-size: 11px; color: var(--text-secondary); }
+
+  /* Tier Pills */
+  .tier-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .tier-chip {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 6px;
+    text-align: center;
+  }
+  .tier-name { font-size: 11px; font-weight: 600; color: var(--text-primary); }
+  .tier-weight { font-size: 10px; color: var(--text-tertiary); }
+  .tier-count {
+    margin-top: 2px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Quick Add Bar */
+  .quick-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  .quick-label { font-size: 11px; color: var(--text-tertiary); margin-right: 2px; }
+
+  /* Calibrate Inline Box */
+  .calibrate-box {
+    display: none;
+    gap: 6px;
+    align-items: center;
+    padding: 8px 10px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    flex-wrap: wrap;
+  }
+  .calibrate-box.open { display: flex; }
+
+  input[type="text"], input[type="number"], select {
+    font-family: inherit;
+    font-size: 12px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 4px 8px;
+    outline: none;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+
+  /* Timeline */
+  .event-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+  .event-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 9px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+  }
+  .event-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .tier-tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 5px;
+    background: rgba(56, 189, 248, 0.14);
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  .event-info { display: flex; flex-direction: column; min-width: 0; }
+  .event-main {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .event-sub { font-size: 11px; color: var(--text-tertiary); }
+  .event-right-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .event-right { text-align: right; font-variant-numeric: tabular-nums; }
+  .event-weight { font-weight: 600; color: var(--text-primary); }
+  .event-rec { font-size: 10px; color: var(--text-tertiary); }
+
+  .empty {
+    text-align: center;
+    padding: 16px 8px;
+    color: var(--text-tertiary);
+    font-size: 12px;
+  }
+
+  /* Settings */
+  details summary {
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+  }
+  details summary::-webkit-details-marker { display: none; }
+  .chev { transition: transform 0.2s; color: var(--text-tertiary); font-size: 11px; }
+  details[open] .chev { transform: rotate(90deg); }
+
+  .preset-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 11px; color: var(--text-secondary); }
+  .toggle-row {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+  }
+  .form-footer {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .analysis-box {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .footer-note {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 0 2px;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 12px;
+    right: 12px;
+    background: #0284c7;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+    opacity: 0;
+    transform: translateY(6px);
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div class="title-wrap">
+      <div class="logo-badge" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="14" rx="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <path d="M21 15l-5-5L5 21"/>
+        </svg>
+      </div>
+      <div>
+        <div class="title" data-i18n="appTitle">生图额度仪表盘</div>
+        <div class="subtitle" id="sub-cal">本地估算 · 近 5 小时滚动窗口</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span class="pill muted" id="cal-pill">初始估值</span>
+      <button class="mini" id="btn-lang" title="Switch Language">EN</button>
+      <button class="mini" id="btn-refresh" title="Refresh">↻ <span data-i18n="refresh">刷新</span></button>
+    </div>
+  </div>
+
+  <!-- Main Quota Gauge Card -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title" data-i18n="estRemaining">预计剩余额度</span>
+      <span class="pill ok" id="health-pill"><span class="dot"></span><span id="health-text">额度充足</span></span>
+    </div>
+
+    <div class="cooldown-banner" id="cooldown-banner">
+      <span id="cooldown-msg">冷却中</span>
+      <button class="mini danger" id="btn-clear-cd" data-i18n="clearCooldown">解除冷却</button>
+    </div>
+
+    <div class="hero-row">
+      <div class="hero-big">
+        <span class="hero-num" id="hero-rem">--</span>
+        <span class="hero-unit" id="hero-unit">点 / ~10 点</span>
+      </div>
+      <div class="hero-meta">
+        <div><span data-i18n="usedLabel">已用：</span><strong id="hero-used">0</strong></div>
+        <div id="hero-rec-row">恢复：<strong>暂无消耗</strong></div>
+      </div>
+    </div>
+
+    <div class="bar-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+      <div class="bar-fill" id="bar-fill" style="width: 100%"></div>
+    </div>
+
+    <!-- Remaining Capacity Equivalent by Resolution Tier -->
+    <div class="capacity-strip">
+      <span data-i18n="canGenLabel">按余量约可再画：</span>
+      <div class="capacity-items" id="capacity-items">
+        <span>512 <strong>~14</strong></span>
+        <span>1K <strong>~10</strong></span>
+        <span>2K <strong>~6</strong></span>
+        <span>4K <strong>~4</strong></span>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-box">
+        <span class="stat-label" data-i18n="weightedLabel">1K 等效加权点数 (weighted)</span>
+        <span class="stat-val" id="stat-weighted">0 / ~10</span>
+        <span class="stat-sub" id="stat-weighted-rem">预计剩余 ~10 点</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-label" data-i18n="countLabel">原始出图张数 (count)</span>
+        <span class="stat-val" id="stat-count">0 / ~10</span>
+        <span class="stat-sub" id="stat-count-rem">预计剩余 ~10 张</span>
+      </div>
+    </div>
+
+    <div class="tier-row">
+      <div class="tier-chip">
+        <div class="tier-name">512</div>
+        <div class="tier-weight">0.67u</div>
+        <div class="tier-count" id="tier-512">0</div>
+      </div>
+      <div class="tier-chip">
+        <div class="tier-name">1K</div>
+        <div class="tier-weight">1.00u</div>
+        <div class="tier-count" id="tier-1K">0</div>
+      </div>
+      <div class="tier-chip">
+        <div class="tier-name">2K</div>
+        <div class="tier-weight">1.50u</div>
+        <div class="tier-count" id="tier-2K">0</div>
+      </div>
+      <div class="tier-chip">
+        <div class="tier-name">4K</div>
+        <div class="tier-weight">2.25u</div>
+        <div class="tier-count" id="tier-4K">0</div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-bar">
+      <span class="quick-label" data-i18n="manualAdd">手动补记：</span>
+      <button class="mini" data-add="512">+1 512</button>
+      <button class="mini" data-add="1K">+1 1K</button>
+      <button class="mini" data-add="2K">+1 2K</button>
+      <button class="mini" data-add="4K">+1 4K</button>
+      <button class="mini warn" id="btn-toggle-cal" style="margin-left:auto;">⚡ <span data-i18n="calibrateBtn">撞限额校准</span></button>
+    </div>
+
+    <div class="calibrate-box" id="cal-box">
+      <span style="font-size:11px;color:var(--text-secondary);" data-i18n="calPrompt">报错重置倒计时：</span>
+      <input type="text" id="cal-input" value="4h 45m" placeholder="4h 45m / 30m" style="width:115px;">
+      <button class="mini primary" id="btn-do-cal" data-i18n="calConfirm">记录校准</button>
+      <button class="mini" id="btn-cancel-cal" data-i18n="cancel">取消</button>
+    </div>
+  </div>
+
+  <!-- Recent 5h Timeline -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title" id="timeline-title">近 5 小时生图记录</span>
+      <span class="subtitle" id="list-count">0 条</span>
+    </div>
+    <div class="event-list" id="event-list">
+      <div class="empty">近 5 小时内暂无生图记录</div>
+    </div>
+  </div>
+
+  <!-- Settings & Analysis -->
+  <div class="card">
+    <details id="settings-details">
+      <summary>
+        <span class="card-title" data-i18n="settingsTitle">参数设置 & 校准分析</span>
+        <span class="chev">▶</span>
+      </summary>
+      <div class="preset-row">
+        <span class="quick-label" data-i18n="presets">上限预设：</span>
+        <button class="mini" data-preset="5">5u / 5张</button>
+        <button class="mini" data-preset="10">10u / 10张</button>
+        <button class="mini" data-preset="20">20u / 20张</button>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="cfg-mode" data-i18n="cfgMode">主显示计费模式</label>
+          <select id="cfg-mode">
+            <option value="weighted">weighted (分辨率加权)</option>
+            <option value="count">count (按原始张数)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="cfg-win" data-i18n="cfgWin">滑动窗口 (小时)</label>
+          <input type="number" id="cfg-win" min="1" max="168" step="0.5" value="5">
+        </div>
+        <div class="field">
+          <label for="cfg-lim-u" data-i18n="cfgLimU">参考上限 (1K 等效点数)</label>
+          <input type="number" id="cfg-lim-u" min="1" max="500" step="0.5" value="10">
+        </div>
+        <div class="field">
+          <label for="cfg-lim-c" data-i18n="cfgLimC">参考上限 (原始张数)</label>
+          <input type="number" id="cfg-lim-c" min="1" max="500" step="1" value="10">
+        </div>
+        <div class="field" style="grid-column:1 / -1;">
+          <label for="cfg-warn" data-i18n="cfgWarn">低额度警戒线 (1K 等效点数)</label>
+          <input type="number" id="cfg-warn" min="0" max="100" step="0.5" value="2">
+        </div>
+        <label class="toggle-row">
+          <span data-i18n="cfgInline">每次生图后在对话内显示一行估算提示</span>
+          <input type="checkbox" id="cfg-inline" checked>
+        </label>
+        <label class="toggle-row">
+          <span data-i18n="cfgConfirm">低额度 / 冷却期生图前弹窗确认</span>
+          <input type="checkbox" id="cfg-confirm">
+        </label>
+        <label class="toggle-row">
+          <span data-i18n="cfgAutoCal">遇到限额报错时自动校准上限</span>
+          <input type="checkbox" id="cfg-autocal" checked>
+        </label>
+        <div class="form-footer">
+          <button class="danger" id="btn-reset" data-i18n="clearAll">清空全部记录</button>
+          <button class="primary" id="btn-save-cfg" data-i18n="saveCfg">保存设置</button>
+        </div>
+      </div>
+      <div class="analysis-box" id="analysis-box"></div>
+    </details>
+  </div>
+
+  <div class="footer-note">
+    <span data-i18n="footerTip">提示：本地估算值，每 15s 自动刷新</span>
+    <span id="last-sync">--:--:--</span>
+  </div>
+</div>
+<div class="toast" id="toast">已更新</div>
+
+<script>
+(function () {
+  // -------------------------------------------------------------------------
+  // Bilingual i18n (zh-CN / en)
+  // -------------------------------------------------------------------------
+  const I18N = {
+    zh: {
+      appTitle: "生图额度仪表盘",
+      refresh: "刷新",
+      estRemaining: "预计剩余额度",
+      clearCooldown: "解除冷却",
+      usedLabel: "已用：",
+      canGenLabel: "按余量约可再画：",
+      weightedLabel: "1K 等效加权点数 (weighted)",
+      countLabel: "原始出图张数 (count)",
+      manualAdd: "手动补记：",
+      calibrateBtn: "撞限额校准",
+      calPrompt: "报错重置倒计时：",
+      calConfirm: "记录校准",
+      cancel: "取消",
+      settingsTitle: "参数设置 & 校准分析",
+      presets: "上限预设：",
+      cfgMode: "主显示计费模式",
+      cfgWin: "滑动窗口 (小时)",
+      cfgLimU: "参考上限 (1K 等效点数)",
+      cfgLimC: "参考上限 (原始张数)",
+      cfgWarn: "低额度警戒线 (1K 等效点数)",
+      cfgInline: "每次生图后在对话内显示一行估算提示",
+      cfgConfirm: "低额度 / 冷却期生图前弹窗确认",
+      cfgAutoCal: "遇到限额报错时自动校准上限",
+      clearAll: "清空全部记录",
+      saveCfg: "保存设置",
+      footerTip: "提示：本地估算值，每 15s 自动刷新",
+      unitPts: "点",
+      unitImg: "张",
+      subCal: (h) => `本地估算 · 近 ${h} 小时滚动窗口`,
+      calDefault: "初始估值",
+      calCount: (n) => `已校准 ×${n}`,
+      healthOk: "额度充足",
+      healthLow: "额度偏低",
+      healthHit: "已触及估值上限",
+      healthCd: "冷却中",
+      recNone: "恢复：<strong>暂无消耗</strong>",
+      recEarliest: (t, cd) => `最早恢复：<strong>${t}</strong>${cd ? ` (${cd})` : ""}`,
+      recUnlock: (t, cd) => `冷却解除：<strong>${t}</strong>${cd ? ` (${cd})` : ""}`,
+      cdBanner: (t, cd) => `⏳ 当前处于生图限额冷却期，预计 ${t} 恢复${cd ? `（约 ${cd} 后）` : ""}`,
+      remPts: (v) => `预计剩余 ~${v} 点`,
+      remImgs: (v) => `预计剩余 ~${v} 张`,
+      timelineTitle: (h) => `近 ${h} 小时生图记录`,
+      itemsCount: (n) => `${n} 条`,
+      emptyList: (h) => `近 ${h} 小时内暂无生图记录。生成图片或点击上方 +1 按钮即可实时记录。`,
+      defaultDim: "默认分辨率",
+      srcManual: "手动补记",
+      generatedAt: (t) => `${t} 生成`,
+      recoversAt: (t) => `${t} 恢复`,
+      deleteTitle: "删除此条记录",
+      syncAt: (t) => `更新于 ${t}`,
+      analysisWait: (n) => `校准分析（有效样本：${n}）：收集至少 2 次不同清晰度组合的撞墙样本后，自动对比加权 vs 按张数的离散度。`,
+      analysisDone: (a) => {
+        const m = { weighted: "更接近【按分辨率加权】", count: "更接近【按张数计数】", inconclusive: "暂无法明显区分" };
+        return `<strong>校准分析（${a.sampleCount} 个样本）</strong>：${m[a.recommendedMode] || a.recommendedMode}<br>加权均值 <code>${a.weightedMean}u</code>（CV=${a.weightedCV}）｜张数均值 <code>${a.countMean}张</code>（CV=${a.countCV}）`;
+      },
+      toastRefreshed: "已刷新",
+      toastAdded: (t) => `已补记 +1 张 ${t}`,
+      toastDeleted: "已删除该条记录",
+      toastCalibrated: "已记录撞墙校准",
+      toastClearedCd: "已解除冷却标记",
+      toastSaved: "设置已保存",
+      toastReset: "已清空全部记录与冷却",
+      toastPreset: (v) => `已填入预设 ${v}，点击“保存设置”生效`,
+      toastFail: "操作失败",
+    },
+    en: {
+      appTitle: "Image Quota Tracker",
+      refresh: "Refresh",
+      estRemaining: "Estimated Remaining",
+      clearCooldown: "Clear Cooldown",
+      usedLabel: "Used: ",
+      canGenLabel: "Est. remaining capacity:",
+      weightedLabel: "1K-Equiv Units (weighted)",
+      countLabel: "Raw Image Count (count)",
+      manualAdd: "Log manual:",
+      calibrateBtn: "Calibrate Limit",
+      calPrompt: "Reset countdown from error:",
+      calConfirm: "Save Sample",
+      cancel: "Cancel",
+      settingsTitle: "Settings & Calibration Analysis",
+      presets: "Limit presets:",
+      cfgMode: "Primary accounting mode",
+      cfgWin: "Rolling window (hours)",
+      cfgLimU: "Est. limit (1K-equiv units)",
+      cfgLimC: "Est. limit (raw images)",
+      cfgWarn: "Low-quota warning threshold (units)",
+      cfgInline: "Show inline estimate bar in chat after generation",
+      cfgConfirm: "Ask confirmation before generating when low / cooling down",
+      cfgAutoCal: "Auto-calibrate limit on rate-limit errors",
+      clearAll: "Clear All Events",
+      saveCfg: "Save Settings",
+      footerTip: "Local estimate · auto-refreshes every 15s",
+      unitPts: "u",
+      unitImg: "imgs",
+      subCal: (h) => `Local estimate · ${h}h rolling window`,
+      calDefault: "Default Est.",
+      calCount: (n) => `Calibrated ×${n}`,
+      healthOk: "Healthy",
+      healthLow: "Running Low",
+      healthHit: "Est. Cap Reached",
+      healthCd: "Cooldown",
+      recNone: "Recovery: <strong>None used</strong>",
+      recEarliest: (t, cd) => `Next slot: <strong>${t}</strong>${cd ? ` (${cd})` : ""}`,
+      recUnlock: (t, cd) => `Unlocks: <strong>${t}</strong>${cd ? ` (${cd})` : ""}`,
+      cdBanner: (t, cd) => `⏳ In rate-limit cooldown until ${t}${cd ? ` (~${cd})` : ""}`,
+      remPts: (v) => `~${v}u remaining`,
+      remImgs: (v) => `~${v} imgs remaining`,
+      timelineTitle: (h) => `Recent ${h}h Generations`,
+      itemsCount: (n) => `${n} items`,
+      emptyList: (h) => `No image generations in the last ${h}h. Generate an image or click +1 above to track.`,
+      defaultDim: "Default size",
+      srcManual: "Manual",
+      generatedAt: (t) => `Created ${t}`,
+      recoversAt: (t) => `Frees ${t}`,
+      deleteTitle: "Delete this entry",
+      syncAt: (t) => `Synced ${t}`,
+      analysisWait: (n) => `Calibration analysis (${n} valid samples): Collect ≥2 rate-limit hits with mixed resolutions to compare weighted vs count variance.`,
+      analysisDone: (a) => {
+        const m = { weighted: "Closer to [Resolution Weighted]", count: "Closer to [Raw Image Count]", inconclusive: "Inconclusive so far" };
+        return `<strong>Calibration Analysis (${a.sampleCount} samples)</strong>: ${m[a.recommendedMode] || a.recommendedMode}<br>Weighted mean <code>${a.weightedMean}u</code> (CV=${a.weightedCV}) · Count mean <code>${a.countMean}</code> (CV=${a.countCV})`;
+      },
+      toastRefreshed: "Refreshed",
+      toastAdded: (t) => `Logged +1 ${t}`,
+      toastDeleted: "Entry removed",
+      toastCalibrated: "Calibration sample saved",
+      toastClearedCd: "Cooldown cleared",
+      toastSaved: "Settings saved",
+      toastReset: "Cleared all events & cooldown",
+      toastPreset: (v) => `Preset ${v} filled — click Save Settings`,
+      toastFail: "Action failed",
+    },
+  };
+
+  let lang = (navigator.language || "zh").toLowerCase().startsWith("zh") ? "zh" : "en";
+  const T = () => I18N[lang];
+
+  function applyStaticI18n() {
+    const dict = T();
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+      const key = el.getAttribute("data-i18n");
+      if (typeof dict[key] === "string") el.textContent = dict[key];
+    });
+    $("btn-lang").textContent = lang === "zh" ? "EN" : "中";
+  }
+
+  // -------------------------------------------------------------------------
+  // SEP-1865 MCP Apps JSON-RPC over postMessage Bridge
+  // -------------------------------------------------------------------------
+  let rpcId = 1;
+  const pending = new Map();
+  let connected = false;
+  let hasData = false;
+  let currentData = null;
+
+  function postRpc(msg) {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage(msg, "*");
+    }
+  }
+
+  function requestHost(method, params) {
+    const id = rpcId++;
+    return new Promise((resolve, reject) => {
+      pending.set(id, { resolve, reject });
+      postRpc({ jsonrpc: "2.0", id, method, params: params || {} });
+      setTimeout(() => {
+        if (pending.has(id)) {
+          pending.delete(id);
+          reject(new Error("Host RPC timeout: " + method));
+        }
+      }, 15000);
+    });
+  }
+
+  function notifyHost(method, params) {
+    postRpc({ jsonrpc: "2.0", method, params: params || {} });
+  }
+
+  function applyHostContext(ctx) {
+    if (!ctx) return;
+    if (ctx.theme) {
+      document.documentElement.setAttribute("data-theme", ctx.theme);
+    }
+    if (ctx.locale && !window._userToggledLang) {
+      lang = String(ctx.locale).toLowerCase().startsWith("zh") ? "zh" : "en";
+      applyStaticI18n();
+      if (currentData) render(currentData);
+    }
+    if (ctx.styles && ctx.styles.variables) {
+      const vars = ctx.styles.variables;
+      for (const key of Object.keys(vars)) {
+        if (vars[key] != null) {
+          document.documentElement.style.setProperty(key, String(vars[key]));
+        }
+      }
+    }
+  }
+
+  window.addEventListener("message", (event) => {
+    const msg = event.data;
+    if (!msg || typeof msg !== "object" || msg.jsonrpc !== "2.0") return;
+
+    if (msg.id != null && !msg.method && pending.has(msg.id)) {
+      const { resolve, reject } = pending.get(msg.id);
+      pending.delete(msg.id);
+      if (msg.error) reject(new Error(msg.error.message || "RPC error"));
+      else resolve(msg.result);
+      return;
+    }
+    if (msg.method === "ping" && msg.id != null) {
+      postRpc({ jsonrpc: "2.0", id: msg.id, result: {} });
+      return;
+    }
+    if (msg.method === "ui/notifications/tool-result" && msg.params) {
+      if (msg.params.structuredContent) {
+        hasData = true;
+        render(msg.params.structuredContent);
+      }
+      return;
+    }
+    if (msg.method === "ui/notifications/host-context-changed" && msg.params) {
+      applyHostContext(msg.params);
+      return;
+    }
+  });
+
+  async function callQuotaAction(args) {
+    const res = await requestHost("tools/call", {
+      name: "quota_action",
+      arguments: args,
+    });
+    if (res && res.structuredContent) {
+      hasData = true;
+      render(res.structuredContent);
+    }
+    return res;
+  }
+
+  function reportSize() {
+    if (!connected) return;
+    notifyHost("ui/notifications/size-changed", { height: Math.ceil(document.documentElement.scrollHeight) });
+  }
+  if (typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(() => reportSize()).observe(document.body);
+  }
+
+  // -------------------------------------------------------------------------
+  // UI Rendering
+  // -------------------------------------------------------------------------
+  const $ = (id) => document.getElementById(id);
+
+  function showToast(text) {
+    const t = $("toast");
+    t.textContent = text;
+    t.classList.add("show");
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove("show"), 1900);
+  }
+
+  function fmtTimeShort(isoOrStr) {
+    if (!isoOrStr) return "-";
+    const d = new Date(isoOrStr);
+    if (isNaN(d.getTime())) return String(isoOrStr);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  }
+
+  function addHoursShort(isoStr, hours) {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return "-";
+    return new Date(d.getTime() + hours * 3600 * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  }
+
+  function fmtRelativeFromLocalStr(localStr) {
+    if (!localStr) return "";
+    // localStr is "yyyy-MM-dd HH:mm:ss" in local time
+    const target = new Date(localStr.replace(" ", "T"));
+    if (isNaN(target.getTime())) return "";
+    const diffMs = target.getTime() - Date.now();
+    if (diffMs <= 60000) return lang === "zh" ? "即将" : "<1m";
+    const totalMin = Math.floor(diffMs / 60000);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  }
+
+  function esc(str) {
+    return String(str == null ? "" : str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function render(data) {
+    if (!data || !data.status) return;
+    currentData = data;
+    const dict = T();
+    const st = data.status;
+    const an = data.analysis || {};
+
+    const mode = st.accountingMode === "count" ? "count" : "weighted";
+    const winH = Number(st.windowHours || 5);
+    const limU = Number(st.estimatedLimitUnits || 10);
+    const limC = Number(st.estimatedLimitCount || 10);
+    const usedU = Number(st.usedUnits || 0);
+    const usedC = Number(st.usedCount || 0);
+    const remU = Number(st.remainingUnits || 0);
+    const remC = Number(st.remainingCount || 0);
+    const warnU = Number(st.warnThresholdUnits != null ? st.warnThresholdUnits : 2);
+    const inCd = Boolean(st.inCooldown);
+    const samples = Number(st.calibrationSamples || 0);
+
+    $("sub-cal").textContent = dict.subCal(winH);
+    $("cal-pill").textContent = samples > 0 ? dict.calCount(samples) : dict.calDefault;
+
+    const primaryRem = mode === "count" ? remC : remU;
+    const primaryLim = mode === "count" ? limC : limU;
+    const primaryUsed = mode === "count" ? usedC : usedU;
+    const unitLabel = mode === "count" ? dict.unitImg : dict.unitPts;
+
+    $("hero-rem").textContent = inCd ? "0" : ("~" + primaryRem);
+    $("hero-unit").textContent = unitLabel + " / ~" + primaryLim + " " + unitLabel;
+    $("hero-used").textContent = primaryUsed + " " + unitLabel;
+
+    const pct = inCd ? 0 : Math.max(0, Math.min(100, (primaryRem / Math.max(0.01, primaryLim)) * 100));
+    const fill = $("bar-fill");
+    fill.style.width = pct.toFixed(1) + "%";
+    fill.classList.remove("low", "cooldown");
+
+    const hp = $("health-pill");
+    hp.classList.remove("ok", "low", "cooldown");
+    if (inCd || pct <= 0) {
+      fill.classList.add("cooldown");
+      hp.classList.add("cooldown");
+      $("health-text").textContent = inCd ? dict.healthCd : dict.healthHit;
+    } else if (remU <= warnU || pct <= 25) {
+      fill.classList.add("low");
+      hp.classList.add("low");
+      $("health-text").textContent = dict.healthLow;
+    } else {
+      hp.classList.add("ok");
+      $("health-text").textContent = dict.healthOk;
+    }
+
+    // Cooldown banner
+    const cdBanner = $("cooldown-banner");
+    if (inCd && st.cooldownUntilLocal) {
+      const tShort = st.cooldownUntilLocal.slice(11, 16);
+      const rel = fmtRelativeFromLocalStr(st.cooldownUntilLocal);
+      $("cooldown-msg").textContent = dict.cdBanner(tShort, rel);
+      cdBanner.classList.add("show");
+      $("hero-rec-row").innerHTML = dict.recUnlock(esc(tShort), esc(rel));
+    } else {
+      cdBanner.classList.remove("show");
+      if (st.nextRecoveryLocal) {
+        const tShort = st.nextRecoveryLocal.slice(11, 16);
+        const rel = fmtRelativeFromLocalStr(st.nextRecoveryLocal);
+        $("hero-rec-row").innerHTML = dict.recEarliest(esc(tShort), esc(rel));
+      } else {
+        $("hero-rec-row").innerHTML = dict.recNone;
+      }
+    }
+
+    // Remaining capacity by tier
+    const cap512 = inCd ? 0 : Math.floor(remU / 0.67);
+    const cap1K  = inCd ? 0 : Math.floor(remU / 1.0);
+    const cap2K  = inCd ? 0 : Math.floor(remU / 1.5);
+    const cap4K  = inCd ? 0 : Math.floor(remU / 2.25);
+    $("capacity-items").innerHTML =
+      `<span>512 <strong>~${cap512}</strong></span>` +
+      `<span>1K <strong>~${cap1K}</strong></span>` +
+      `<span>2K <strong>~${cap2K}</strong></span>` +
+      `<span>4K <strong>~${cap4K}</strong></span>`;
+
+    // Dual track boxes
+    $("stat-weighted").textContent = usedU + " / ~" + limU + " " + dict.unitPts;
+    $("stat-weighted-rem").textContent = inCd ? dict.healthCd : dict.remPts(remU);
+    $("stat-count").textContent = usedC + " / ~" + limC + " " + dict.unitImg;
+    $("stat-count-rem").textContent = inCd ? dict.healthCd : dict.remImgs(remC);
+
+    // Tier breakdown
+    const tb = st.tierBreakdown || {};
+    $("tier-512").textContent = Number(tb["512"] || 0);
+    $("tier-1K").textContent = Number(tb["1K"] || 0) + Number(tb["1K*"] || 0);
+    $("tier-2K").textContent = Number(tb["2K"] || 0);
+    $("tier-4K").textContent = Number(tb["4K"] || 0);
+
+    // Recent events list
+    $("timeline-title").textContent = dict.timelineTitle(winH);
+    const evs = Array.isArray(st.recentEvents) ? st.recentEvents.slice().reverse() : [];
+    $("list-count").textContent = dict.itemsCount(evs.length);
+    const listEl = $("event-list");
+    if (evs.length === 0) {
+      listEl.innerHTML = '<div class="empty">' + esc(dict.emptyList(winH)) + '</div>';
+    } else {
+      listEl.innerHTML = evs.map((e) => {
+        const dimStr = (e.width && e.height) ? (e.width + "×" + e.height) : dict.defaultDim;
+        const srcLabel = e.source === "manual" ? dict.srcManual : (e.source || "image-generator");
+        const tStr = fmtTimeShort(e.timestamp);
+        const recStr = addHoursShort(e.timestamp, winH);
+        return (
+          '<div class="event-item">' +
+            '<div class="event-left">' +
+              '<span class="tier-tag">' + esc(e.tier || "1K") + '</span>' +
+              '<div class="event-info">' +
+                '<div class="event-main">' + esc(dimStr) + ' · ' + esc(srcLabel) + '</div>' +
+                '<div class="event-sub">' + esc(dict.generatedAt(tStr)) + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="event-right-wrap">' +
+              '<div class="event-right">' +
+                '<div class="event-weight">+' + esc(e.weight) + 'u</div>' +
+                '<div class="event-rec">' + esc(dict.recoversAt(recStr)) + '</div>' +
+              '</div>' +
+              '<button class="icon-del" data-del="' + esc(e.id) + '" title="' + esc(dict.deleteTitle) + '">×</button>' +
+            '</div>' +
+          '</div>'
+        );
+      }).join("");
+    }
+
+    // Sync settings form when user isn't typing inside it
+    const active = document.activeElement;
+    const inSettings = active && $("settings-details").contains(active);
+    if (!inSettings) {
+      $("cfg-mode").value = mode;
+      $("cfg-win").value = winH;
+      $("cfg-lim-u").value = limU;
+      $("cfg-lim-c").value = limC;
+      $("cfg-warn").value = warnU;
+      $("cfg-inline").checked = st.showInlineNotice !== false;
+      $("cfg-confirm").checked = Boolean(st.confirmBeforeLowQuota);
+      $("cfg-autocal").checked = Boolean(st.autoCalibrate);
+    }
+
+    // Calibration analysis
+    if (an && an.enoughData) {
+      $("analysis-box").innerHTML = dict.analysisDone(an);
+    } else {
+      $("analysis-box").textContent = dict.analysisWait(Number((an && an.sampleCount) || 0));
+    }
+
+    $("last-sync").textContent = dict.syncAt(data.serverTimeLocal || new Date().toLocaleTimeString([], { hour12: false }));
+    reportSize();
+  }
+
+  // -------------------------------------------------------------------------
+  // Event Listeners
+  // -------------------------------------------------------------------------
+  $("btn-lang").addEventListener("click", () => {
+    window._userToggledLang = true;
+    lang = lang === "zh" ? "en" : "zh";
+    applyStaticI18n();
+    if (currentData) render(currentData);
+  });
+
+  $("btn-refresh").addEventListener("click", async () => {
+    try {
+      await callQuotaAction({ action: "refresh" });
+      showToast(T().toastRefreshed);
+    } catch { showToast(T().toastFail); }
+  });
+
+  document.querySelectorAll("button[data-add]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const tier = btn.getAttribute("data-add");
+      btn.disabled = true;
+      try {
+        await callQuotaAction({ action: "add", tier, count: 1 });
+        showToast(T().toastAdded(tier));
+      } catch { showToast(T().toastFail); }
+      finally { btn.disabled = false; }
+    });
+  });
+
+  // Event delegation for per-item delete button
+  $("event-list").addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("button[data-del]");
+    if (!btn) return;
+    const eventId = btn.getAttribute("data-del");
+    btn.disabled = true;
+    try {
+      await callQuotaAction({ action: "delete", eventId });
+      showToast(T().toastDeleted);
+    } catch { showToast(T().toastFail); btn.disabled = false; }
+  });
+
+  $("btn-clear-cd").addEventListener("click", async () => {
+    try {
+      await callQuotaAction({ action: "clear-cooldown" });
+      showToast(T().toastClearedCd);
+    } catch { showToast(T().toastFail); }
+  });
+
+  $("btn-toggle-cal").addEventListener("click", () => {
+    $("cal-box").classList.toggle("open");
+    reportSize();
+  });
+  $("btn-cancel-cal").addEventListener("click", () => {
+    $("cal-box").classList.remove("open");
+    reportSize();
+  });
+  $("btn-do-cal").addEventListener("click", async () => {
+    const rt = ($("cal-input").value || "5h 0m").trim();
+    try {
+      await callQuotaAction({ action: "calibrate", resetText: rt });
+      $("cal-box").classList.remove("open");
+      showToast(T().toastCalibrated);
+    } catch { showToast(T().toastFail); }
+  });
+
+  document.querySelectorAll("button[data-preset]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const val = Number(btn.getAttribute("data-preset"));
+      $("cfg-lim-u").value = val;
+      $("cfg-lim-c").value = val;
+      showToast(T().toastPreset(val));
+    });
+  });
+
+  $("btn-save-cfg").addEventListener("click", async () => {
+    try {
+      await callQuotaAction({
+        action: "config",
+        settings: {
+          accountingMode: $("cfg-mode").value,
+          windowHours: Number($("cfg-win").value) || 5,
+          estimatedLimitUnits: Number($("cfg-lim-u").value) || 10,
+          estimatedLimitCount: parseInt($("cfg-lim-c").value, 10) || 10,
+          warnThresholdUnits: Number($("cfg-warn").value),
+          showInlineNotice: $("cfg-inline").checked,
+          confirmBeforeLowQuota: $("cfg-confirm").checked,
+          autoCalibrate: $("cfg-autocal").checked,
+        },
+      });
+      showToast(T().toastSaved);
+    } catch { showToast(T().toastFail); }
+  });
+
+  $("btn-reset").addEventListener("click", async () => {
+    try {
+      await callQuotaAction({ action: "reset" });
+      showToast(T().toastReset);
+    } catch { showToast(T().toastFail); }
+  });
+
+  // -------------------------------------------------------------------------
+  // Connect Handshake & Auto-Refresh
+  // -------------------------------------------------------------------------
+  applyStaticI18n();
+
+  async function connect() {
+    try {
+      const res = await requestHost("ui/initialize", {
+        appInfo: { name: "image-quota-tracker", version: "0.3.0" },
+        appCapabilities: {},
+        protocolVersion: "2026-01-26",
+      });
+      connected = true;
+      if (res && res.hostContext) applyHostContext(res.hostContext);
+      notifyHost("ui/notifications/initialized", {});
+      reportSize();
+
+      setTimeout(() => {
+        if (!hasData) {
+          callQuotaAction({ action: "refresh" }).catch(() => {});
+        }
+      }, 500);
+
+      setInterval(() => {
+        if (!document.hidden && connected) {
+          callQuotaAction({ action: "refresh" }).catch(() => {});
+        }
+      }, 15000);
+    } catch {
+      $("last-sync").textContent = "Standalone preview";
+    }
+  }
+
+  connect();
+})();
+</script>
+</body>
+</html>

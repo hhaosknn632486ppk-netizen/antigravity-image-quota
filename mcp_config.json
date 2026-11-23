@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "dashboard": {
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${PLUGIN_ROOT}/scripts/mcp-server.ps1"
+      ],
+      "env": {
+        "IMAGE_QUOTA_DATA_DIR": "${PLUGIN_DATA}"
+      }
+    }
+  }
+}
